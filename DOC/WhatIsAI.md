@@ -193,7 +193,7 @@ while True:
 
 ---
 
-### Week 1：LLMを動かす
+### Week 1：[LLMを動かす](Week1.md)
 
 * Mistralをローカルで動かす
 * Promptの練習
