@@ -200,7 +200,7 @@ while True:
 
 ---
 
-### Week 2：Toolsをつなぐ
+### Week 2：[Toolsをつなぐ](Week2.md)
 
 * Python tool
 * Web search tool
