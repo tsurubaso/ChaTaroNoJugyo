@@ -16,7 +16,10 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
+    "@langchain/community": "^0.0.57",
+    "@langchain/core": "^0.3.80",
     "axios": "^1.13.5",
+    "langchain": "^0.3.37",
     "ollama": "^0.6.3"
   }
 }

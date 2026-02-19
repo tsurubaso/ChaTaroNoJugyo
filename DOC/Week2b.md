@@ -1,163 +1,161 @@
+# Week2：AI AgentにToolを持たせる（本格版）
 
+こんにちは、chaTaro先生です。
+Week2ではついに「AIが道具（Tool）を使う」段階に入ります。
 
-# 本格Toolで作るAI Agent（Real Version）
+Week1ではAI（LLM）を動かしました。
+でもAIは言葉を生成するだけで、現実の作業はできません。
 
-あなたが求めているのはこれです：
+そこでWeek2のテーマはこれです：
 
-* LLMが「Toolを選ぶ」
-* Toolを正しい形で呼ぶ
-* 結果を見て次を決める
+**AI + Tools = Agent**
 
 つまり：
 
-**Function Calling / Tool Calling Agent**
+* AIが考える
+* 必要ならToolを使う
+* 結果を見て答える
+
+これが「AI Agent」です。
 
 ---
 
-# 今日の本物スタック（先生おすすめ）
+## Week2のゴール
 
-Open Sourceで本格的にやります：
+今回の最終ゴールは：
 
-* Ollama（ローカルLLM）
-* LangChain JS（Agent Framework）
-* Tavily Search（本物の検索API）
-* Tool Calling（function schema）
+ユーザー：「2+10を計算してください」
+AI：「計算が必要だ」
+→ calculator tool を呼ぶ
+→ 結果を受け取る
+→ Final Answer を返す
 
-これが今一番現実的です。
+if文で決めるのではなく、
 
----
+**AIが自分でToolを選ぶ**
 
-# Step 0：必要なもの
-
-確認：
-
-* Node.js OK
-* Ollama OK（動く状態）
-
-まず：
-
-```bash
-ollama run mistral
-```
-
-これが動けば準備OKです。
+ここが本格的です。
 
 ---
 
-# Step 1：本格ライブラリを入れる
+## なぜTool Callingが難しいのか？
 
-プロジェクトで：
+最初に私たちは `createToolCallingAgent` を試しました。
 
-```bash
-npm install langchain @langchain/community @langchain/core
-npm install tavily-search
-```
+しかしOllama + Mistralは
 
----
+* OpenAIのFunction Callingのような仕組みを持っていない
 
-# Step 2：Tavily API Key を取る
+そのため：
 
-TavilyはAgent用の検索で一番安定です。
-
-サイト：
-
-[https://tavily.com/](https://tavily.com/)
-
-無料でキーがもらえます。
-
-キーを `.env` に入れます：
-
-```env
-TAVILY_API_KEY=xxxxx
-```
-
-そして：
-
-```bash
-npm install dotenv
-```
+Tool Calling Agentは動きませんでした。
 
 ---
 
-# Step 3：本物のWeb Search Tool
+## 解決策：ReAct Agent
 
-`tools/webSearch.js`
+Open Source環境で現実的なのはこれです：
+
+**ReAct Agent**
+
+ReActとは：
+
+Reason（考える）
+Action（道具を使う）
+Observation（結果を見る）
+
+この流れでAIが動きます。
+
+AIは文章でこう書きます：
+
+* Thought: 計算が必要だ
+* Action: calculator
+* Action Input: 2+10
+* Observation: 12
+* Final Answer: 答えは12です
+
+LangChainがこの形式を読み取り、Toolを実行します。
+
+---
+
+# 実際に動くコード（Week2完成版）
+
+以下があなたが成功した「本物のAgentコード」です。
+
+---
+
+## agent.js（ReAct + Ollama + Tool）
 
 ```js
-import { TavilySearchResults } from "@langchain/community/tools/tavily_search"
-
-export const webSearchTool = new TavilySearchResults({
-  maxResults: 3,
-})
-```
-
-これはもう本物です。
-
----
-
-# Step 4：本物のJavaScript Tool
-
-eval禁止。安全版。
-
-`tools/jsTool.js`
-
-```js
-import { DynamicTool } from "@langchain/core/tools"
-import vm from "node:vm"
-
-export const jsTool = new DynamicTool({
-  name: "javascript_calculator",
-  description: "Math calculation tool. Input must be a math expression like 2+5*10",
-  func: async (input) => {
-    const result = vm.runInNewContext(input)
-    return String(result)
-  },
-})
-```
-
-これが本格Toolです。
-
----
-
-# Step 5：Ollama LLMをAgentに入れる
-
-`agent.js`
-
-```js
-import "dotenv/config"
-
 import { ChatOllama } from "@langchain/community/chat_models/ollama"
-import { createToolCallingAgent } from "langchain/agents"
-import { AgentExecutor } from "langchain/agents"
+import { DynamicTool } from "@langchain/core/tools"
 
-import { webSearchTool } from "./tools/webSearch.js"
-import { jsTool } from "./tools/jsTool.js"
+import { createReactAgent, AgentExecutor } from "langchain/agents"
+import { ChatPromptTemplate } from "@langchain/core/prompts"
 
 async function main() {
-  // LLM
+  // 1. LLM（頭脳）
   const llm = new ChatOllama({
     model: "mistral",
     temperature: 0,
   })
 
-  // Tools
-  const tools = [webSearchTool, jsTool]
-
-  // Agent
-  const agent = await createToolCallingAgent({
-    llm,
-    tools,
+  // 2. Tool（道具）
+  const calculator = new DynamicTool({
+    name: "calculator",
+    description: "Math calculator. Input should be like 2+2 or 10*5.",
+    func: async (input) => {
+      return String(eval(input))
+    },
   })
 
+  const tools = [calculator]
+
+  // 3. ReAct Prompt（Agentのルール）
+  const prompt = ChatPromptTemplate.fromMessages([
+    [
+      "system",
+      `
+You are an AI agent.
+
+You can use the following tools:
+
+{tools}
+
+Tool names: {tool_names}
+
+Use this format:
+
+Question: the input question
+Thought: think step by step
+Action: the tool name
+Action Input: the input for the tool
+Observation: the tool result
+... (repeat if needed)
+Final Answer: the final answer to the user
+`,
+    ],
+    ["human", "{input}"],
+    ["placeholder", "{agent_scratchpad}"],
+  ])
+
+  // 4. Agent作成（ReAct）
+  const agent = await createReactAgent({
+    llm,
+    tools,
+    prompt,
+  })
+
+  // 5. Executor（実行管理）
   const executor = new AgentExecutor({
     agent,
     tools,
     verbose: true,
   })
 
-  // Test
+  // 6. 実行
   const result = await executor.invoke({
-    input: "富士山の高さを調べてください",
+    input: "2+10を計算してください",
   })
 
   console.log("\n=== FINAL ANSWER ===")
@@ -169,55 +167,58 @@ main()
 
 ---
 
-# Step 6：実行
+# 実行結果
 
-```bash
-node agent.js
+実行すると：
+
+```json
+"output": "The answer to your question is 12."
 ```
 
-するとこうなります：
-
-* LLMが判断する
-* webSearchToolを呼ぶ
-* 結果を読む
-* 日本語で答える
-
-本物です。
+成功です。
 
 ---
 
-# これが「ふりじゃないAgent」
+# Week2で学んだことまとめ
 
-あなたが欲しかったのはこれです：
+あなたはWeek2で以下を達成しました：
 
-* if文で選ぶのではない
-* AIが自分でToolを選ぶ
-* 本物の検索をする
-* 本物の計算をする
+* Toolとは何か理解した
+* AIがToolを使う必要性を学んだ
+* OllamaはFunction Calling非対応だと理解した
+* ReAct形式ならOpen SourceでAgentが動くと分かった
+* LangChainで本物のAgentループを作った
+
+つまり：
+
+**あなたは本当にAI Agent開発を始めました**
 
 ---
 
-# chaTaro先生の質問（超重要）
+# 次のWeek3でやること
 
-ここで止まる人が多いので確認します。
+Week2でToolが1つ動きました。
 
-あなたは今：
+Week3では：
 
-✅ Ollamaは動いていますか？
-（`ollama run mistral` が成功する？）
+* Web検索Tool追加
+* Toolを複数にする
+* Memoryを入れる
+* 複数ステップタスクをやらせる
 
-そして：
+最終的には：
 
-Tavily API Key は取れますか？
+「AI秘書」に進化します。
 
-もしまだなら、先生は
+---
 
-* Tavilyなし版（無料Web検索）
-* 完全ローカル版
+## chaTaro先生から一言😊
 
-も教えられます。
+ここまで来た学生は少ないです。
+あなたは本当に強いです。
 
-どっちがいいですか？
+次は自然です：
 
-1. Tavilyで本格Web検索（おすすめ）
-2. 完全ローカルだけでTool Agent（ネット無し）
+**Web検索Toolを追加してAgentを現実世界につなげましょう。**
+
+[Week 3](Week3b.md)

@@ -202,22 +202,22 @@ while True:
 
 ### Week 2：[Toolsをつなぐ](Week2.md)
 
-* Python tool
+* Javascript tool
 * Web search tool
 
 ---
 
-### Week 3：Memoryを入れる
+### Week 3：[Memoryを入れる](Week3b.md)
 
-* 会話ログ保存
-* Vector DB
+* Calculation
+* Web search tool
 
 ---
 
-### Week 4：本物のAgentを作る
+### Week 4：[Memoryを入れる](Week4.md)
 
-* タスク実行
-* 自動プランニング
+* 必勝AgentがMemoryを使うように
+* Json Memory
 
 ---
 

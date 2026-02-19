@@ -1,56 +1,48 @@
 import { ChatOllama } from "@langchain/community/chat_models/ollama"
-import { DynamicTool } from "@langchain/core/tools"
-
 import { createReactAgent, AgentExecutor } from "langchain/agents"
 import { ChatPromptTemplate } from "@langchain/core/prompts"
 
+import { wikiTool } from "./tools/wiki.js"
+import { calculator } from "./tools/calculator.js"
+
 async function main() {
-  // LLM (Ollama)
   const llm = new ChatOllama({
     model: "mistral",
     temperature: 0,
   })
 
-  // Tool
-  const calculator = new DynamicTool({
-    name: "calculator",
-    description: "Math calculator. Input should be like 2+2 or 10*5.",
-    func: async (input) => {
-      return String(eval(input))
-    },
-  })
+  const tools = [wikiTool, calculator]
 
-  const tools = [calculator]
-
-  // ✅ Correct ReAct Prompt
   const prompt = ChatPromptTemplate.fromMessages([
     [
       "system",
       `
-You are an AI agent.
+You are a smart AI assistant.
 
-You can use the following tools:
+You have access to these tools:
 
 {tools}
-
 Tool names: {tool_names}
 
-Use this format:
+RULES:
+- When a question needs factual numbers, use wikipedia_search.
+- When you need math, ALWAYS use calculator.
+- Extract numeric values carefully before calculating.
 
-Question: the input question
-Thought: think step by step
-Action: the tool name
-Action Input: the input for the tool
-Observation: the tool result
-... (repeat if needed)
-Final Answer: the final answer to the user
+Use ReAct format:
+
+Question: ...
+Thought: ...
+Action: ...
+Action Input: ...
+Observation: ...
+Final Answer: ...
 `,
     ],
     ["human", "{input}"],
     ["placeholder", "{agent_scratchpad}"],
   ])
 
-  // ReAct Agent
   const agent = await createReactAgent({
     llm,
     tools,
@@ -63,9 +55,8 @@ Final Answer: the final answer to the user
     verbose: true,
   })
 
-  // Run
   const result = await executor.invoke({
-    input: "2+10を計算してください",
+    input: "富士山の高さは東京タワー何個分ですか？",
   })
 
   console.log("\n=== FINAL ANSWER ===")
