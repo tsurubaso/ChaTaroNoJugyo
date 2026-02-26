@@ -2,10 +2,10 @@ import { ChatOllama } from "@langchain/community/chat_models/ollama"
 import { createReactAgent, AgentExecutor } from "langchain/agents"
 import { ChatPromptTemplate } from "@langchain/core/prompts"
 
-import { wikiTool } from "./tools/wiki.js"
-import { calculator } from "./tools/calculator.js"
-import { memoryTool } from "./tools/memory.js"
-import { memoryWriteTool } from "./tools/memory_write.js"
+import { wikiTool } from "../tools/wiki.js"
+import { calculator } from "../tools/calculator.js"
+import { memoryTool } from "../tools/memory.js"
+import { memoryWriteTool } from "../tools/memory_write.js"
 async function main() {
   const llm = new ChatOllama({
     model: "mistral",
