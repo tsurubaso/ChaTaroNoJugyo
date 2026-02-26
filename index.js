@@ -1,4 +1,4 @@
-import { exec } from "child_process";
+import { spawn } from "child_process";
 
 async function parseWithLLM(text) {
   const prompt = `
@@ -8,11 +8,18 @@ Return ONLY valid JSON.
 
 {
   "shape": "cube | sphere | cylinder",
-  "size": number,
-  "color": [r, g, b]
+  "count": number,
+  "size_base": number,
+  "size_var": number,
+  "color": [r, g, b],
+  "color_var": number,
+  "pattern": "line | circle"
 }
 
-Color must be RGB values between 0 and 1.
+Rules:
+- RGB values between 0 and 1
+- All numbers must be valid
+- No explanation text
 
 Sentence:
 "${text}"
@@ -39,20 +46,58 @@ Sentence:
 
 async function main() {
   const input = process.argv.slice(2).join(" ");
+  const params = await parseWithLLM(input);
 
-  const { shape, size, color } = await parseWithLLM(input);
+  const {
+    shape,
+    count,
+    size_base,
+    size_var,
+    color,
+    color_var,
+    pattern,
+  } = params;
 
-  exec(
-    `blender --background --python generate5.py -- ${shape} ${size} ${color[0]} ${color[1]} ${color[2]}`,
-    (error) => {
-      if (error) {
-        console.error(error);
-        return;
-      }
-      console.log("Blender finished.");
-      console.log(`${shape} ${size} ${color[0]} ${color[1]} ${color[2]}`)
-    }
-  );
+  const blenderArgs = [
+    "--background",
+    "--python",
+    "generate6.py",
+    "--",
+    shape,
+    String(count),
+    String(size_base),
+    String(size_var),
+    String(color[0]),
+    String(color[1]),
+    String(color[2]),
+    String(color_var),
+    pattern,
+  ];
+
+  console.log("PARAMS SENT TO BLENDER:");
+console.log({
+  shape,
+  count,
+  size_base,
+  size_var,
+  color,
+  color_var,
+  pattern
+});
+
+  const blender = spawn("blender", blenderArgs);
+
+  blender.stdout.on("data", (data) => {
+    console.log(data.toString());
+  });
+
+  blender.stderr.on("data", (data) => {
+    console.error(data.toString());
+  });
+
+  blender.on("close", (code) => {
+    console.log(`Blender exited with code ${code}`);
+  });
 }
 
 main();
